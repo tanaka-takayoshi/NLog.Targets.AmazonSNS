@@ -51,6 +51,12 @@ namespace NLog.Targets.AmazonSNS
     [Target("SNSTarget")]
     public class SNSTarget : TargetWithLayout
     {
+        private static readonly int MAX_MESSAGE_SIZE = 64 * 1024;
+        private static readonly string TRUNCATE_MESSAGE = " [truncated]";
+        private static readonly Encoding TRANSFER_ENCODING = Encoding.UTF8;
+        private static readonly int TRUNCATE_SIZE
+            = MAX_MESSAGE_SIZE - TRANSFER_ENCODING.GetByteCount(TRUNCATE_MESSAGE);
+
         private AmazonSimpleNotificationServiceClient client;
 
         public string AwsAccessKey { get; set; }
@@ -79,6 +85,13 @@ namespace NLog.Targets.AmazonSNS
             var logMessage = Layout.Render(logEvent);
             var subject = Subject.Render(logEvent);
 
+            var count = Encoding.UTF8.GetByteCount(logMessage);
+            if (count > MAX_MESSAGE_SIZE)
+            {
+                //削除
+                logMessage = logMessage.LeftB(TRANSFER_ENCODING, TRUNCATE_SIZE)
+                     + TRUNCATE_MESSAGE;
+            }
             client.Publish(new PublishRequest()
             {
                 Message = logMessage,
@@ -87,4 +100,23 @@ namespace NLog.Targets.AmazonSNS
             });
         }
     }
+
+    public static class StringExtention
+    {
+        public static string LeftB(this string s, Encoding encoding, int maxByteCount)
+        {
+            var bytes = encoding.GetBytes(s);
+            if (bytes.Length <= maxByteCount) return s;
+
+            var result = s.Substring(0,
+                encoding.GetString(bytes, 0, maxByteCount).Length);
+
+            while (encoding.GetByteCount(result) > maxByteCount)
+            {
+                result = result.Substring(0, result.Length - 1);
+            }
+            return result;
+        }
+    }
+
 }
