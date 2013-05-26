@@ -45,6 +45,7 @@ using System.Linq;
 using System.Text;
 using System.ComponentModel;
 using Amazon.SimpleNotificationService.Model;
+using NLog.Common;
 
 namespace NLog.Targets.AmazonSNS
 {
@@ -77,7 +78,14 @@ namespace NLog.Targets.AmazonSNS
         {
             base.InitializeTarget();
 
-            client = new AmazonSimpleNotificationServiceClient(AwsAccessKey, AwsSecretKey, RegionEndpoint.GetBySystemName(Endpoint));
+            try
+            {
+                client = new AmazonSimpleNotificationServiceClient(AwsAccessKey, AwsSecretKey, RegionEndpoint.GetBySystemName(Endpoint));
+            }
+            catch (Exception e)
+            {
+                InternalLogger.Fatal("Amazon SNS client failed to be configured. This logger wont'be send any message. Error is\n{0}\n{1}", e.Message, e.StackTrace);
+            }
         }
 
         protected override void Write(LogEventInfo logEvent)
@@ -88,16 +96,29 @@ namespace NLog.Targets.AmazonSNS
             var count = Encoding.UTF8.GetByteCount(logMessage);
             if (count > MAX_MESSAGE_SIZE)
             {
+                if (InternalLogger.IsWarnEnabled)
+                    InternalLogger.Warn("logging message will be truncted. original message is\n{0}",
+                        logMessage);
                 //削除
                 logMessage = logMessage.LeftB(TRANSFER_ENCODING, TRUNCATE_SIZE)
                      + TRUNCATE_MESSAGE;
             }
-            client.Publish(new PublishRequest()
+            try
             {
-                Message = logMessage,
-                Subject = subject,
-                TopicArn = TopicArn
-            });
+                client.Publish(new PublishRequest()
+                {
+                    Message = logMessage,
+                    Subject = subject,
+                    TopicArn = TopicArn
+                });
+            }
+            catch (AmazonSimpleNotificationServiceException e)
+            {
+                InternalLogger.Fatal("RequstId: {0},ErrorType: {1}, Status: {2}\nFailed to send log with\n{3}\n{4}",
+                    e.RequestId, e.ErrorType, e.StatusCode,
+                    e.Message, e.StackTrace);
+            }
+            
         }
     }
 
