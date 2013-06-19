@@ -77,10 +77,17 @@ namespace NLog.Targets.AmazonSNS
         protected override void InitializeTarget()
         {
             base.InitializeTarget();
-
             try
             {
-                client = new AmazonSimpleNotificationServiceClient(AwsAccessKey, AwsSecretKey, RegionEndpoint.GetBySystemName(Endpoint));
+                if (string.IsNullOrEmpty(AwsAccessKey) && string.IsNullOrEmpty(AwsSecretKey))
+                {
+                    InternalLogger.Info("AWS Access Keys are not specified. Use Application Setting or EC2 Instance profile for keys.");
+                    client = new AmazonSimpleNotificationServiceClient(RegionEndpoint.GetBySystemName(Endpoint));
+                }
+                else
+                {
+                    client = new AmazonSimpleNotificationServiceClient(AwsAccessKey, AwsSecretKey, RegionEndpoint.GetBySystemName(Endpoint));
+                }
             }
             catch (Exception e)
             {
@@ -99,7 +106,6 @@ namespace NLog.Targets.AmazonSNS
                 if (InternalLogger.IsWarnEnabled)
                     InternalLogger.Warn("logging message will be truncted. original message is\n{0}",
                         logMessage);
-                //削除
                 logMessage = logMessage.LeftB(TRANSFER_ENCODING, TRUNCATE_SIZE)
                      + TRUNCATE_MESSAGE;
             }
