@@ -52,11 +52,10 @@ namespace NLog.Targets.AmazonSNS
     [Target("SNSTarget")]
     public class SNSTarget : TargetWithLayout
     {
-        private static readonly int MAX_MESSAGE_SIZE = 64 * 1024;
+        private static readonly int DEFAULT_MAX_MESSAGE_SIZE = 64;
         private static readonly string TRUNCATE_MESSAGE = " [truncated]";
         private static readonly Encoding TRANSFER_ENCODING = Encoding.UTF8;
-        private static readonly int TRUNCATE_SIZE
-            = MAX_MESSAGE_SIZE - TRANSFER_ENCODING.GetByteCount(TRUNCATE_MESSAGE);
+        private int truncateSizeInBytes;
 
         private AmazonSimpleNotificationServiceClient client;
 
@@ -67,6 +66,8 @@ namespace NLog.Targets.AmazonSNS
         [DefaultValue("{$message}")]
         public Layout Subject { get; set; }
         public string TopicArn { get; set; }
+        public int? MaxMessageSize { get; set; }
+        public int ConfiguredMaxMessageSizeInBytes { get; private set; }
 
         public SNSTarget()
         {
@@ -77,6 +78,22 @@ namespace NLog.Targets.AmazonSNS
         protected override void InitializeTarget()
         {
             base.InitializeTarget();
+            var size = MaxMessageSize ?? 64;
+            if (size <= 0 || size >= 256)
+            {
+                ConfiguredMaxMessageSizeInBytes = 256 * 1024;
+            }
+            else if (size <= 64)
+            {
+                ConfiguredMaxMessageSizeInBytes = 64 * 1024;
+            }
+            else
+            {
+                ConfiguredMaxMessageSizeInBytes = size * 1024;
+            }
+            InternalLogger.Info(string.Format("Max message size is set to {0} KB.", ConfiguredMaxMessageSizeInBytes / 1024));
+            truncateSizeInBytes = ConfiguredMaxMessageSizeInBytes - TRANSFER_ENCODING.GetByteCount(TRUNCATE_MESSAGE);
+
             try
             {
                 if (string.IsNullOrEmpty(AwsAccessKey) && string.IsNullOrEmpty(AwsSecretKey))
@@ -101,12 +118,12 @@ namespace NLog.Targets.AmazonSNS
             var subject = Subject.Render(logEvent);
 
             var count = Encoding.UTF8.GetByteCount(logMessage);
-            if (count > MAX_MESSAGE_SIZE)
+            if (count > ConfiguredMaxMessageSizeInBytes)
             {
                 if (InternalLogger.IsWarnEnabled)
                     InternalLogger.Warn("logging message will be truncted. original message is\n{0}",
                         logMessage);
-                logMessage = logMessage.LeftB(TRANSFER_ENCODING, TRUNCATE_SIZE)
+                logMessage = logMessage.LeftB(TRANSFER_ENCODING, truncateSizeInBytes)
                      + TRUNCATE_MESSAGE;
             }
             try
