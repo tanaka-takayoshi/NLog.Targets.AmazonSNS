@@ -52,9 +52,9 @@ namespace NLog.Targets.AmazonSNS
     [Target("SNSTarget")]
     public class SNSTarget : TargetWithLayout
     {
-        private static readonly int DEFAULT_MAX_MESSAGE_SIZE = 64;
-        private static readonly string TRUNCATE_MESSAGE = " [truncated]";
-        private static readonly Encoding TRANSFER_ENCODING = Encoding.UTF8;
+        private static readonly int DefaultMaxMessageSize = 64;
+        private static readonly string TruncateMessage = " [truncated]";
+        private static readonly Encoding TransferEncoding = Encoding.UTF8;
         private int truncateSizeInBytes;
 
         private AmazonSimpleNotificationServiceClient client;
@@ -78,21 +78,21 @@ namespace NLog.Targets.AmazonSNS
         protected override void InitializeTarget()
         {
             base.InitializeTarget();
-            var size = MaxMessageSize ?? 64;
+            var size = MaxMessageSize ?? DefaultMaxMessageSize;
             if (size <= 0 || size >= 256)
             {
                 ConfiguredMaxMessageSizeInBytes = 256 * 1024;
             }
-            else if (size <= 64)
+            else if (size <= DefaultMaxMessageSize)
             {
-                ConfiguredMaxMessageSizeInBytes = 64 * 1024;
+                ConfiguredMaxMessageSizeInBytes = DefaultMaxMessageSize * 1024;
             }
             else
             {
                 ConfiguredMaxMessageSizeInBytes = size * 1024;
             }
             InternalLogger.Info(string.Format("Max message size is set to {0} KB.", ConfiguredMaxMessageSizeInBytes / 1024));
-            truncateSizeInBytes = ConfiguredMaxMessageSizeInBytes - TRANSFER_ENCODING.GetByteCount(TRUNCATE_MESSAGE);
+            truncateSizeInBytes = ConfiguredMaxMessageSizeInBytes - TransferEncoding.GetByteCount(TruncateMessage);
 
             try
             {
@@ -123,8 +123,8 @@ namespace NLog.Targets.AmazonSNS
                 if (InternalLogger.IsWarnEnabled)
                     InternalLogger.Warn("logging message will be truncted. original message is\n{0}",
                         logMessage);
-                logMessage = logMessage.LeftB(TRANSFER_ENCODING, truncateSizeInBytes)
-                     + TRUNCATE_MESSAGE;
+                logMessage = logMessage.LeftB(TransferEncoding, truncateSizeInBytes)
+                     + TruncateMessage;
             }
             try
             {
