@@ -1,5 +1,6 @@
 NLog.Targets.AmazonSNS
 ======================
+[![Build status](https://ci.appveyor.com/api/projects/status?id=i16eafsfedh5q3g9)](https://ci.appveyor.com/project/nlog-targets-amazonsns)
 
 Nlog target for Amazon Simple Notification Service (SNS)
 
